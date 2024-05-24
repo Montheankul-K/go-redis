@@ -1,0 +1,57 @@
+version: '3.9'
+services:
+  redis:
+    image: redis
+    platform: linux/amd64
+    container_name: redis
+    ports:
+      - 6379:6379 # redis default port
+    volumes:
+      - ./data/redis:/data #external:internal
+      - ./config/redis.conf:/redis.conf
+    command: redis-server /redis.conf # start redis server
+
+  k6:
+    image: loadimpact/k6
+    platform: linux/amd64
+    container_name: k6
+    environment:
+      - K6_OUT=influxdb=http://admin:admin@influxdb:8086/k6 # service:port/database
+    volumes:
+      - ./scripts:/scripts
+
+  influxdb:
+    image: influxdb:1.8.10 # version 2.0 + have own dashboard
+    platform: linux/amd64
+    container_name: influxdb
+    environment:
+      - INFLUXDB_DB=k6
+      - INFLUXDB_HTTP_MAX_BODY_SIZE=0 # not limit http body size
+    ports:
+      - 8086:8086 # don't need to expose port if k6 in docker network
+    volumes:
+      - ./data/influxdb:/var/lib/influxdb
+
+  grafana:
+    image: grafana/grafana
+    platform: linux/amd64
+    container_name: grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true # anonymous can access
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin # give admin role to anonymous
+    ports:
+      - 3000:3000
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+
+  mariadb:
+    image: mariadb
+    platform: linux/amd64
+    container_name: mariadb
+    environment:
+      - MARIADB_ROOT_PASSWORD=P@ssw0rd
+      - MARIADB_DATABASE=redis-demo
+    ports:
+      - 3306:3306
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
